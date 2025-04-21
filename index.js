@@ -6,33 +6,54 @@ app.use(express.json({ limit: '50mb' }));
 
 app.post('/annotate', async (req, res) => {
   try {
-    const pdfBytes = Buffer.from(req.body.pdfBase64, 'base64');
+    const { pdfBase64, annotations } = req.body;
+
+    // Validate input
+    if (!pdfBase64 || !Array.isArray(annotations)) {
+      return res.status(400).send('Missing pdfBase64 or annotations array');
+    }
+
+    const pdfBytes = Buffer.from(pdfBase64, 'base64');
     const pdfDoc = await PDFDocument.load(pdfBytes);
-
     const pages = pdfDoc.getPages();
-    const firstPage = pages[0]; // ✅ define the page before using it
 
-    // 🎯 Draw a static red rectangle — purely for visibility test
-    firstPage.drawRectangle({
-      x: 50,
-      y: 700,
-      width: 300,
-      height: 40,
-      borderColor: rgb(1, 0, 0),
-      borderWidth: 2,
-      color: undefined,
+    annotations.forEach((ann) => {
+      const page = pages[ann.page - 1];
+      if (!page) return;
+
+      const { x, y } = ann.position || {};
+      const { width, height } = ann.dimensions || {};
+
+      if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') {
+        console.warn('Skipping annotation due to missing or invalid dimensions:', ann);
+        return;
+      }
+
+      // 🟥 Draw red rectangle border only
+      page.drawRectangle({
+        x,
+        y,
+        width,
+        height,
+        borderColor: rgb(1, 0, 0),
+        borderWidth: 2,
+        color: undefined, // No fill
+      });
     });
 
-    const annotatedPdf = await pdfDoc.save();
-    const base64 = Buffer.from(annotatedPdf).toString('base64');
-
-    res.json({ annotatedPdfBase64: base64 });
+    const modified = await pdfDoc.save();
+    const annotatedPdfBase64 = Buffer.from(modified).toString('base64');
+    res.json({ annotatedPdfBase64 });
   } catch (err) {
-    console.error(err);
-    res.status(500).send('Failed to annotate');
+    console.error('PDF Annotation Error:', err);
+    res.status(500).send('Error annotating PDF');
   }
 });
 
+app.get('/', (req, res) => {
+  res.send('🧠 PDF Annotator API is alive');
+});
+
 app.listen(process.env.PORT || 3000, () => {
-  console.log('✅ PDF Annotator API running');
+  console.log('🟢 PDF Annotator API running...');
 });
