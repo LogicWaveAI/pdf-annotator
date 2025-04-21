@@ -18,13 +18,27 @@ app.post('/annotate', async (req, res) => {
       const page = pages[pageIndex];
       if (!page) return;
 
-      page.drawText(ann.note, {
-        x: ann.position.x,
-        y: ann.position.y,
-        size: 10,
-        font,
-        color: rgb(1, 0, 0),
-      });
+      // If the annotation includes dimensions, draw a rectangle
+      if (ann.dimensions && ann.position) {
+        page.drawRectangle({
+          x: ann.position.x,
+          y: ann.position.y,
+          width: ann.dimensions.width,
+          height: ann.dimensions.height,
+          borderColor: rgb(1, 0, 0),
+          borderWidth: 1,
+          color: undefined  // No fill
+        });
+      } else if (ann.position && ann.note) {
+        // Fallback: draw the note as red text
+        page.drawText(ann.note, {
+          x: ann.position.x,
+          y: ann.position.y,
+          size: 10,
+          font,
+          color: rgb(1, 0, 0),
+        });
+      }
     });
 
     const annotatedPdfBytes = await pdfDoc.save();
